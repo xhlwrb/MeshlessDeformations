@@ -14,6 +14,8 @@ ICameraSceneNode* addCameraSceneNode(ISceneNode* parent,
 		zoomSpeed, translationSpeed);
 	node->drop();
 
+	//setActiveCamera()
+	// Sets the currently active camera.
 	Globals::sceneManager->setActiveCamera(node);
 
 	return node;
