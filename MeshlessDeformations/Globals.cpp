@@ -1,6 +1,6 @@
 #include "Globals.h"
 
-
+//██████████████████████████████████████████████████████████████████████████████████
 irr::core::matrix4 volumeNormalize(irr::core::matrix4 A) {
 
 	Matrix A_calc(3,3);
@@ -24,6 +24,7 @@ irr::core::matrix4 volumeNormalize(irr::core::matrix4 A) {
 	return A;
 }
 
+//██████████████████████████████████████████████████████████████████████████████████
 irr::core::matrix4 sqrt(irr::core::matrix4 A) {
 
 //1- [E D] = eig(A); sqrtm(A) = E * sqrt(D) * E' where D is a diagonal matrix.
@@ -57,6 +58,7 @@ irr::core::matrix4 sqrt(irr::core::matrix4 A) {
 	return A;
 }
 
+//██████████████████████████████████████████████████████████████████████████████████
 // reflection with normal  
 core::vector3df getReflected( core::vector3df vector, core::vector3df normal ) { 
 	f32 length = (f32)vector.getLength();
@@ -69,7 +71,10 @@ core::vector3df getReflected( core::vector3df vector, core::vector3df normal ) {
 scene::ISceneManager* Globals::sceneManager = 0;
 
 video::IVideoDriver* Globals::driver = 0;
-f32 Globals::gravity = 0.7f;f32 Globals::drag = 0.005f;f32 Globals::timeElapsed = 0.0f;bool Globals::drawGoalPositions = true;
+f32 Globals::gravity = 0.7f;
+f32 Globals::drag = 0.005f;
+f32 Globals::timeElapsed = 0.0f;
+bool Globals::drawGoalPositions = true;
 bool Globals::stopMode = false;
 bool Globals::useShadows = false;
 
