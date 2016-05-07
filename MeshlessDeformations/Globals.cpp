@@ -24,7 +24,6 @@ irr::core::matrix4 volumeNormalize(irr::core::matrix4 A) {
 	return A;
 }
 
-//██████████████████████████████████████████████████████████████████████████████████
 irr::core::matrix4 sqrt(irr::core::matrix4 A) {
 
 //1- [E D] = eig(A); sqrtm(A) = E * sqrt(D) * E' where D is a diagonal matrix.
