@@ -29,9 +29,14 @@ void DeformableObject::doInitialCalculations() {
 	originalCentreOfMass = tmpSum / tmpMass;   
 
 	// update q_i
+	//clear()
+	// Clears the array and deletes all allocated memory.
 	q.clear();
 	for (u32 index = 0; index < particles.size(); index++) {
 		Particle* p = particles[index];
+		//push_back()
+		// Adds an element at back of array.
+		// If the array is too small to add this new element it is made bigger.
 		q.push_back(p->originalPosition - originalCentreOfMass);
 	}
 
@@ -41,6 +46,7 @@ void DeformableObject::doInitialCalculations() {
 		// m_i*p*q^T
 		Particle *par = particles[i];
 		f32 m = par->weight;
+//██████████████████████████████████████████████████████████████████████████████████
 		A_qq_inverse(0,0)+=m*q[i].X*q[i].X; A_qq_inverse(1,0)+=m*q[i].X*q[i].Y; A_qq_inverse(2,0)+=m*q[i].X*q[i].Z;
 		A_qq_inverse(0,1)+=m*q[i].Y*q[i].X; A_qq_inverse(1,1)+=m*q[i].Y*q[i].Y; A_qq_inverse(2,1)+=m*q[i].Y*q[i].Z;
 		A_qq_inverse(0,2)+=m*q[i].Z*q[i].X; A_qq_inverse(1,2)+=m*q[i].Z*q[i].Y; A_qq_inverse(2,2)+=m*q[i].Z*q[i].Z;
@@ -83,6 +89,7 @@ void DeformableObject::doInitialCalculations() {
 void DeformableObject::addParticle(Particle* particle) {
 	int nr = particles.size();
 	particles.push_back( particle );
+//██████████████████████████████████████████████████████████████████████████████████
 	particle->nr = nr;
 	finished = false;
 }
@@ -262,6 +269,8 @@ void DeformableObject::update(f32 timeElapsed) {
 }
 
 void DeformableObject::setVisible(bool isVisible){
+	//setVisible
+	// Sets if the node should be visible or not.
 	ISceneNode::setVisible(isVisible);
 
 	for (u32 i = 0; i < particles.size(); i++) {
