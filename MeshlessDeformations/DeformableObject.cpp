@@ -9,7 +9,13 @@ using namespace Model;
 //CONSTRUCTORS
 DeformableObject::DeformableObject(core::stringw name) : ModelObject(ObjectType::DeformableObject)
 {
+	//beta 
+	// To control the amount of influence the linear transformation has on the shape matching, the parameter beta is used
+	// By using a smaller value for β, the ratio of rotation-to-pure deformation will increase
+	// and so the goal positions will more closely match the original, undeformed shape of the object.
 	beta = 0.0f;
+	//alpha 
+	// a parameter which simulates stiffness
 	alpha = 0.5f;
 	elasticity = 0.5f;
 	this->name = name;
@@ -23,9 +29,12 @@ void DeformableObject::doInitialCalculations() {
 	float tmpMass = 0.0f;
 	for (u32 index = 0; index < particles.size(); index++) {
 		Particle* particle = particles[index];
-		tmpSum += particle->originalPosition * particle->weight;
+		//tmpSum += particle->originalPosition * particle->weight;
+		// sigma(m_i * x0_i)
+		tmpSum += particle->weight * particle->originalPosition;
 		tmpMass += particle->weight;
 	}
+	// x0_cm = sigma(m_i * x0_i) / sigma(m_i)
 	originalCentreOfMass = tmpSum / tmpMass;   
 
 	// update q_i
@@ -37,22 +46,23 @@ void DeformableObject::doInitialCalculations() {
 		//push_back()
 		// Adds an element at back of array.
 		// If the array is too small to add this new element it is made bigger.
+		// q_i = x0_i - x0_cm
 		q.push_back(p->originalPosition - originalCentreOfMass);
 	}
 
 	// calculate A_qq
 	matrix4 A_qq_inverse;
-	for(int i=0;i<(int)particles.size(); i++) {
-		// m_i*p*q^T
+	for(int i = 0; i < (int)particles.size(); i++) {
+		// m_i * q_i * (q_i)^T
 		Particle *par = particles[i];
 		f32 m = par->weight;
-//██████████████████████████████████████████████████████████████████████████████████
 		A_qq_inverse(0,0)+=m*q[i].X*q[i].X; A_qq_inverse(1,0)+=m*q[i].X*q[i].Y; A_qq_inverse(2,0)+=m*q[i].X*q[i].Z;
 		A_qq_inverse(0,1)+=m*q[i].Y*q[i].X; A_qq_inverse(1,1)+=m*q[i].Y*q[i].Y; A_qq_inverse(2,1)+=m*q[i].Y*q[i].Z;
 		A_qq_inverse(0,2)+=m*q[i].Z*q[i].X; A_qq_inverse(1,2)+=m*q[i].Z*q[i].Y; A_qq_inverse(2,2)+=m*q[i].Z*q[i].Z;
 	}
+	// ^T
 	A_qq_inverse.getInverse(A_qq);
-
+//██████████████████████████████████████████████████████████████████████████████████
 	// update q_tilde_i
 	q_tilde.clear();
 	for (u32 index = 0; index < particles.size(); index++) {
@@ -70,6 +80,7 @@ void DeformableObject::doInitialCalculations() {
 		q_tilde.push_back(t);
 	}
 
+//██████████████████████████████████████████████████████████████████████████████████
 	// calculate A_tilde_qq
 	SquareMatrix A_tilde_qq_inverse(9);
 	A_tilde_qq_inverse = 0.0;
@@ -89,7 +100,6 @@ void DeformableObject::doInitialCalculations() {
 void DeformableObject::addParticle(Particle* particle) {
 	int nr = particles.size();
 	particles.push_back( particle );
-//██████████████████████████████████████████████████████████████████████████████████
 	particle->nr = nr;
 	finished = false;
 }
@@ -102,13 +112,14 @@ matrix4 DeformableObject::calculateA_pqMatrix()
 {
 	matrix4 A_pq;
 	for(int i=0;i<(int)particles.size(); i++) {
-		// m_i*p*q^T
+		// m_i * p_i * (q_i)^T
 		Particle *par = particles[i];
 		f32 m = par->weight;
 		A_pq(0,0)+=m*p[i].X*q[i].X; A_pq(1,0)+=m*p[i].X*q[i].Y; A_pq(2,0)+=m*p[i].X*q[i].Z;
 		A_pq(0,1)+=m*p[i].Y*q[i].X; A_pq(1,1)+=m*p[i].Y*q[i].Y; A_pq(2,1)+=m*p[i].Y*q[i].Z;
 		A_pq(0,2)+=m*p[i].Z*q[i].X; A_pq(1,2)+=m*p[i].Z*q[i].Y; A_pq(2,2)+=m*p[i].Z*q[i].Z;
 	}
+//██████████████████████████████████████████████████████████████████████████████████
 	return A_pq.getTransposed();
 }
 
@@ -173,6 +184,7 @@ void DeformableObject::updateGoalPositions(f32 timeElapsed) {
 		// 2. Linear Deformations
 		matrix4 A_pq = calculateA_pqMatrix();
 		matrix4 R = calculateRotationMatrix(A_pq);
+//██████████████████████████████████████████████████████████████████████████████████
 		matrix4 A = volumeNormalize(A_pq * A_qq);
 		matrix4 Transform;
 		for (int i=0; i<16; i++) {
@@ -193,7 +205,8 @@ void DeformableObject::updateGoalPositions(f32 timeElapsed) {
 		}
 	} else if (Globals::mode == DeformationMode::Quadratic) {
 		// 3. Quadratic deformation
-		Matrix T_tilde = Matrix(3,9); T_tilde = 0.0;
+		Matrix T_tilde = Matrix(3,9); 
+		T_tilde = 0.0;
 
 		p_tilde.clear();
 		for (u32 index = 0; index < particles.size(); index++) {
@@ -215,6 +228,7 @@ void DeformableObject::updateGoalPositions(f32 timeElapsed) {
 
 
 		Matrix A_tilde_square(9, 9);
+//██████████████████████████████████████████████████████████████████████████████████
 		A_tilde_square = IdentityMatrix(9);
 		for(int j=0;j<3;j++) {
 			for(int i=0;i<9;i++) { 
@@ -276,6 +290,7 @@ void DeformableObject::setVisible(bool isVisible){
 	for (u32 i = 0; i < particles.size(); i++) {
 		Particle* particle = particles [i];
 		if (isVisible) {
+//██████████████████████████████████████████████████████████████████████████████████
 			particle->setID(particle->getID() | ObjectType::SelectableObject);
 		} else {
 			particle->setID(particle->getID() ^ ObjectType::SelectableObject);
