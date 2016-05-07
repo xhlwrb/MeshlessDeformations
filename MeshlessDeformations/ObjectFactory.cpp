@@ -8,14 +8,16 @@ void ObjectFactory::createObjects (void) {
 	// set up some objects
 
 	{ // set up one
+	// DeformableObject(core::stringw name)
 	Model::DeformableObject* object = new Model::DeformableObject( L"Cube One" );
 	object->alpha = 0.323f;
 	Globals::selectedObject = object;
 	Globals::objects.push_back( object );
 
-
+	// Particle(DeformableObject *owner, f32 radius, f32 weight)
 	Model::Particle* particle1 = new Model::Particle(object, 7, 1);
 	particle1->setOriginalPosition( core::vector3df( 0.0f, 0.0f, 0.0f ) );
+	// addParticle(Particle* particle)
 	object->addParticle(particle1);
 
 	Model::Particle* particle2 = new Model::Particle(object, 7, 1);
@@ -46,7 +48,7 @@ void ObjectFactory::createObjects (void) {
 	particle8->setOriginalPosition( core::vector3df( 20.0f, 20.0f, 20.0f ) );
 	object->addParticle( particle8 );
 
-	
+	// setVisible(bool isVisible)
 	object->setVisible(true);
 
 	}
