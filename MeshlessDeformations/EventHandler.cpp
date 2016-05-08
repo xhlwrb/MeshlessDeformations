@@ -18,7 +18,10 @@ bool EventHandler::OnEvent(SEvent event)
 		core::position2d< s32 > mousePosition(event.MouseInput.X, event.MouseInput.Y);
 		
 		if (event.MouseInput.Event == EMIE_LMOUSE_PRESSED_DOWN ) {
-
+			//getSceneCollisionManager()
+			// Get pointer to the scene collision manager.
+			//getSceneNodeFromScreenCoordinatesBB()
+			// Gets the scene node, which is currently visible under the given screencoordinates, viewed from the currently active camera.
 			selectedSceneNode = (Model::ModelObject*)Globals::sceneManager->getSceneCollisionManager()->getSceneNodeFromScreenCoordinatesBB( mousePosition, ObjectType::SelectableObject );
 
 
@@ -32,6 +35,8 @@ bool EventHandler::OnEvent(SEvent event)
 
 				core::vector3df normal = Globals::camera->getPosition() - Globals::camera->getTarget();
 				normal.normalize();
+				//plane3d()
+				// Template plane class with some intersection testing methods. 
 				movePlane = core::plane3d<f32>( startPosition, normal );
 
 				if (selectedSceneNode->is( ObjectType::ParticleType ) ) {
