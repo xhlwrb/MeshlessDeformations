@@ -16,7 +16,8 @@ IGUIListBox* GUIManager::objectsListbox = 0;
 
 
 bool GUIManager::GUIEvent( SEvent event ) {
-
+	//Caller
+	// IGUIElement who called the event.
 	IGUIElement* caller = event.GUIEvent.Caller;
 
 	switch(event.GUIEvent.EventType)
@@ -36,11 +37,31 @@ bool GUIManager::GUIEvent( SEvent event ) {
 					std::cout << Globals::selectedObject->beta  << "\n" << std::flush;
 					return true;
 				}
-			} else if (caller == timeScrollbar) {				f32 value = timeScrollbar->getPos() / 1000.0f;								if (value < 0.1f) {					Globals::stopMode = true;				} else {					Globals::stopMode = false;					Globals::device->getTimer()->setSpeed( value );				}				std::cout << value << "\n" << std::flush;
+			} else if (caller == timeScrollbar) {
+				f32 value = timeScrollbar->getPos() / 1000.0f;
 
-				return true;			} else if (caller == gravityScrollbar) {				Globals::gravity = gravityScrollbar->getPos() / 1000.0f;				std::cout << Globals::gravity << "\n" << std::flush;
-				return true;			} else if (caller == elasticityScrollbar) {				if (Globals::selectedObject) {					Globals::selectedObject->elasticity = elasticityScrollbar->getPos()/1000.0f;					std::cout << Globals::selectedObject->elasticity << "\n" << std::flush;
-					return true;				}			}
+				
+
+				if (value < 0.1f) {
+					Globals::stopMode = true;
+				} else {
+					Globals::stopMode = false;
+					Globals::device->getTimer()->setSpeed( value );
+				}
+				std::cout << value << "\n" << std::flush;
+
+				return true;
+			} else if (caller == gravityScrollbar) {
+				Globals::gravity = gravityScrollbar->getPos() / 1000.0f;
+				std::cout << Globals::gravity << "\n" << std::flush;
+				return true;
+			} else if (caller == elasticityScrollbar) {
+				if (Globals::selectedObject) {
+					Globals::selectedObject->elasticity = elasticityScrollbar->getPos()/1000.0f;
+					std::cout << Globals::selectedObject->elasticity << "\n" << std::flush;
+					return true;
+				}
+			}
 			break;
 		case EGET_CHECKBOX_CHANGED:
 			if (caller == goalPositionsCheckbox) {
