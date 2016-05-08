@@ -181,7 +181,6 @@ ModelObject* Particle::getCollidedObject ( const vector3df &newPosition ) {
 // Not sure if Reflection from Borders works this way.
 void Particle::update(f32 timeElapsed) {
 	
-//██████████████████████████████████████████████████████████████████████████████████
 	if (isSelected) {
 		// the user currently has this particle picked up with their mouse,
 		// so let's not change anything but grab its current position for 
