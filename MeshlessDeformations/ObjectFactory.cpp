@@ -10,6 +10,7 @@ void ObjectFactory::createObjects (void) {
 	{ // set up one
 	// DeformableObject(core::stringw name)
 	Model::DeformableObject* object = new Model::DeformableObject( L"Cube One" );
+	// alpha is a parameter which simulates stiffness
 	object->alpha = 0.323f;
 	Globals::selectedObject = object;
 	Globals::objects.push_back( object );
