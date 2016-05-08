@@ -62,8 +62,8 @@ void DeformableObject::doInitialCalculations() {
 	}
 	// ^T
 	A_qq_inverse.getInverse(A_qq);
-//██████████████████████████████████████████████████████████████████████████████████
 	// update q_tilde_i
+	// q_tilde = [q_x, q_y, q_z, q_x^2, q_y^2, q_z^2, q_x * q_y, q_y * q_z, q_z * q_x]^T
 	q_tilde.clear();
 	for (u32 index = 0; index < particles.size(); index++) {
 		Particle* p = particles[index];
@@ -80,11 +80,11 @@ void DeformableObject::doInitialCalculations() {
 		q_tilde.push_back(t);
 	}
 
-//██████████████████████████████████████████████████████████████████████████████████
 	// calculate A_tilde_qq
 	SquareMatrix A_tilde_qq_inverse(9);
 	A_tilde_qq_inverse = 0.0;
 	for (u32 index = 0; index < particles.size(); index++) {
+		// m_i * q_tilde_i * q_tilde_i^T
 		A_tilde_qq_inverse += q_tilde[index] * q_tilde[index].t();
 	}
 
