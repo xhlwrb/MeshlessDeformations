@@ -37,13 +37,18 @@ int main()
 	Globals::sceneManager = smgr;
 
 	//Window Title
+	//setWindowCaption()
+	// Sets the caption of the window.
 	device->setWindowCaption(L"Meshless Deformations");
 
 	//Setup the Camera
-	//ICameraSceneNode *camera = smgr->addCameraSceneNode(0, core::vector3df(0,0,-200), core::vector3df(0,0,0), 0);
-	//ICameraSceneNode *camera = smgr->addCameraSceneNodeFPS(0, 50, 50, 0);
-	Globals::camera = addCameraSceneNode(0,-1500,  600, 1500, 0);
+	//addCameraSceneNode(ISceneNode* parent, f32 rotateSpeed, f32 zoomSpeed, f32 translationSpeed, s32 id)
+	Globals::camera = addCameraSceneNode(0, -1500,  600, 1500, 0);
+	//setPosition()
+	// Sets the position of the node relative to its parent.
 	Globals::camera->setPosition( core::vector3df( 0.0f, -80.0f, -190.0f ) );
+	//setTarget()
+	// Sets the look at target of the camera.
 	Globals::camera->setTarget( core::vector3df( 0.0f, -80.0f, 0.0f ) );
 
 	
@@ -55,6 +60,9 @@ int main()
 	Globals::init(device);
 
 	// set up the lighting
+	//addLightSceneNode()
+	// Adds a dynamic light scene node to the scene graph.
+	// The light will cast dynamic light on all other scene nodes in the scene
 	smgr->addLightSceneNode(0, core::vector3df(0.0f, 350.0f, 0.0f), video::SColorf(1.0f,1.0f,0.9f), 500.0f, 0);
 	driver->setAmbientLight(SColorf( 0.6f, 0.6f, 0.6f, 0.0f ));
 	
