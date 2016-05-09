@@ -23,77 +23,267 @@ DeformableObject::DeformableObject(core::stringw name) : ModelObject(ObjectType:
 	isSelected = false;
 }
 
+double DeformableObject::averageLinkageDist(core::array<Particle*> cluster1, core::array<Particle*> cluster2){
+	/* Returns the float average (mean) distance between all
+	pairs of points, where one point is from self and the
+	other point is from other.Uses the Euclidean dist
+	between 2 points, defined in Point.*/
+	double dist = 0;
+	int index = 0;
+	for (int i = 0; i < cluster1.size(); i++) {
+		for (int j = 0; j < cluster2.size(); j++){
+			double diff_x = cluster1[i]->getPosition().X - cluster1[i]->getPosition().X;
+			double diff_y = cluster1[i]->getPosition().Y - cluster1[i]->getPosition().Y;
+			double diff_z = cluster1[i]->getPosition().Z - cluster1[i]->getPosition().Z;
+			dist = sqrt(diff_x * diff_x + diff_y * diff_y + diff_z * diff_z);
+			index += 1;
+		}
+	}
+	double ave_dist = dist / index;
+	return ave_dist;
+}
+
+core::array<core::array<Particle*>> DeformableObject::findClosest(core::array<core::array<Particle*>> clusters){
+	double min = std::numeric_limits<double>::max();
+	double dist = 0;
+	core::array<Particle*> cluster1;
+	core::array<Particle*> cluster2;
+	for (int i = 0; i < clusters.size(); i++) {
+		for (int j = i + 1; j < clusters.size(); j++) {
+			dist = DeformableObject::averageLinkageDist(clusters[i], clusters[j]);
+			if (min > dist){
+				min = dist;
+				cluster1 = clusters[i];
+				cluster2 = clusters[j];
+			}
+		}
+	}
+	core::array<core::array<Particle*>> ret;
+	ret.push_back(cluster1);
+	ret.push_back(cluster2);
+	return ret;
+}
+
+int DeformableObject::search_particle(core::array<Particle*>cluster, Particle* particle){
+	for (int i = 0; i < cluster.size(); i++){
+		if (cluster[i]->getPosition() == particle->getPosition()){
+			return i;
+		}
+	}
+	return -1;
+}
+
+int DeformableObject::search_cluster(core::array<core::array<Particle*>> clusters, core::array<Particle*>cluster){
+	for (int i = 0; i < clusters.size(); i++){
+		for (int j = 0; j < clusters[i].size(); j++){
+			if (search_particle(cluster, clusters[i][j]) == -1){
+				return -1;
+			}
+		}
+		return i;
+	}
+}
+
+core::array<core::array <Particle*>> DeformableObject::mergeClusters(core::array<core::array<Particle*>> clusters, core::array<Particle*> cluster1, core::array<Particle*> cluster2){
+	core::array<Particle*> new_cluster;
+	int inx_cluster1, inx_cluster2;
+	for (int i = 0; i < cluster1.size(); i++) {
+		new_cluster.push_back(cluster1[i]);
+	}
+	for (int i = 0; i < cluster2.size(); i++) {
+			if (search_particle(cluster1, cluster2[i]) == -1){
+			new_cluster.push_back(cluster2[i]);
+		}
+	}
+	clusters.push_back(new_cluster);
+	inx_cluster1 = search_cluster(clusters, cluster1);
+	inx_cluster2 = search_cluster(clusters, cluster2);
+	clusters.erase(inx_cluster1);
+	clusters.erase(inx_cluster2);
+	return clusters;
+}
+
+core::array<core::array<Particle*>> DeformableObject::mergeOne(core::array<core::array<Particle*>> clusters){
+	core::array<Particle*> cluster1;
+	core::array<Particle*> cluster2;
+	core::array<core::array<Particle*>> ret_clusters;
+	core::array<core::array<Particle*>> ret_findclosest = DeformableObject::findClosest(clusters);
+	cluster1 = ret_findclosest[0];
+	cluster2 = ret_findclosest[1];
+	ret_clusters = DeformableObject::mergeClusters(clusters, cluster1, cluster2);
+	return ret_clusters;
+}
+
+core::array<core::array<Particle*>> DeformableObject::cluster_merge(array<Particle*> all_particles, int num_clusters){
+	core::array<core::array <Particle*>> clusters;
+	core::array <Particle*> push;
+	for (int i = 0; i < all_particles.size(); i++){
+		push.push_back(all_particles[i]);
+		clusters.push_back(push);
+		push.clear();
+	}
+	while(clusters.size() > num_clusters){
+		clusters = DeformableObject::mergeOne(clusters);
+	}
+	return clusters;
+}
+
+int DeformableObject::which_cluster(Particle* p){
+	for (int i = 0; i < clusters.size(); i++){
+		// this cluster
+		if (search_particle(clusters[i], p) != -1){
+			// in this cluster
+			return i;
+		}
+	}
+	return -1;
+}
+
 void DeformableObject::doInitialCalculations() {
-	// calculate centre of mass (t_0)
-	vector3df tmpSum(0.0f,0.0f,0.0f);
-	float tmpMass = 0.0f;
-	for (u32 index = 0; index < particles.size(); index++) {
-		Particle* particle = particles[index];
-		//tmpSum += particle->originalPosition * particle->weight;
-		// sigma(m_i * x0_i)
-		tmpSum += particle->weight * particle->originalPosition;
-		tmpMass += particle->weight;
-	}
-	// x0_cm = sigma(m_i * x0_i) / sigma(m_i)
-	originalCentreOfMass = tmpSum / tmpMass;   
+	if (Globals::mode == DeformationMode::ClusterBased) {
+		// 4. Cluster-Bases deformation
 
-	// update q_i
-	//clear()
-	// Clears the array and deletes all allocated memory.
-	q.clear();
-	for (u32 index = 0; index < particles.size(); index++) {
-		Particle* p = particles[index];
-		//push_back()
-		// Adds an element at back of array.
-		// If the array is too small to add this new element it is made bigger.
-		// q_i = x0_i - x0_cm
-		q.push_back(p->originalPosition - originalCentreOfMass);
-	}
+		// merge clusters
+		int num_clusters = 5;
+		DeformableObject::clusters = DeformableObject::cluster_merge(particles, num_clusters);
 
-	// calculate A_qq
-	matrix4 A_qq_inverse;
-	for(int i = 0; i < (int)particles.size(); i++) {
-		// m_i * q_i * (q_i)^T
-		Particle *par = particles[i];
-		f32 m = par->weight;
-		A_qq_inverse(0,0)+=m*q[i].X*q[i].X; A_qq_inverse(1,0)+=m*q[i].X*q[i].Y; A_qq_inverse(2,0)+=m*q[i].X*q[i].Z;
-		A_qq_inverse(0,1)+=m*q[i].Y*q[i].X; A_qq_inverse(1,1)+=m*q[i].Y*q[i].Y; A_qq_inverse(2,1)+=m*q[i].Y*q[i].Z;
-		A_qq_inverse(0,2)+=m*q[i].Z*q[i].X; A_qq_inverse(1,2)+=m*q[i].Z*q[i].Y; A_qq_inverse(2,2)+=m*q[i].Z*q[i].Z;
-	}
-	// ^T
-	A_qq_inverse.getInverse(A_qq);
-	// update q_tilde_i
-	// q_tilde = [q_x, q_y, q_z, q_x^2, q_y^2, q_z^2, q_x * q_y, q_y * q_z, q_z * q_x]^T
-	q_tilde.clear();
-	for (u32 index = 0; index < particles.size(); index++) {
-		Particle* p = particles[index];
-		ColumnVector t(9);
-		t.element(0) = q[index].X;
-		t.element(1) = q[index].Y;
-		t.element(2) = q[index].Z;
-		t.element(3) = q[index].X * q[index].X;
-		t.element(4) = q[index].Y * q[index].Y;
-		t.element(5) = q[index].Z * q[index].Z;
-		t.element(6) = q[index].X * q[index].Y;
-		t.element(7) = q[index].Y * q[index].Z;
-		t.element(8) = q[index].Z * q[index].X;
-		q_tilde.push_back(t);
-	}
+		// calculate centre of mass (t_0)
+		core::array<vector3df> originalCentreOfMass, tmpSum;
+		core::array<float> tmpMass = 0.0f;
+		tmpSum = (0.0f, 0.0f, 0.0f);
+		for (int i = 0; i < clusters.size(); i++){
+			// this cluster
+			vector3df sum(0.0f, 0.0f, 0.0f);
+			float mass = 0.0f;
+			for (u32 index = 0; index < particles.size(); index++) {
+				Particle* particle = particles[index];
+				//tmpSum += particle->originalPosition * particle->weight;
+				// sigma(m_i * x0_i)
+				if (which_cluster(particle) == i){
+					// if this particle is in this cluster
+					sum.X += particle->weight * particle->originalPosition.X;
+					sum.Y += particle->weight * particle->originalPosition.Y;
+					sum.Z += particle->weight * particle->originalPosition.Z;
+					mass += particle->weight;
+				}// this particle over
+			}// all the particles in this cluster over
+			tmpSum.push_back(sum);
+			tmpMass.push_back(mass);
+			// next cluster
+		}// all the clusters over
+		// x0_cm = sigma(m_i * x0_i) / sigma(m_i)
+		for (int i = 0; i < clusters.size(); i++){
+			vector3df centre(0.0f, 0.0f, 0.0f);
+			centre.X += tmpSum[i].X / tmpMass[i];
+			centre.Y += tmpSum[i].Y / tmpMass[i];
+			centre.Z += tmpSum[i].Z / tmpMass[i];
+			originalCentreOfMass.push_back(centre);
+		}
 
-	// calculate A_tilde_qq
-	SquareMatrix A_tilde_qq_inverse(9);
-	A_tilde_qq_inverse = 0.0;
-	for (u32 index = 0; index < particles.size(); index++) {
-		// m_i * q_tilde_i * q_tilde_i^T
-		A_tilde_qq_inverse += q_tilde[index] * q_tilde[index].t();
-	}
+		// update q_i
+		//clear()
+		// Clears the array and deletes all allocated memory.
+		q.clear();
+		for (u32 index = 0; index < particles.size(); index++) {
+			Particle* particle = particles[index];
+			//push_back()
+			// Adds an element at back of array.
+			// If the array is too small to add this new element it is made bigger.
+			// q_i = x0_i - x0_cm
+			int i = which_cluster(particle);
+			if (i != -1){
+				q.push_back(particle->originalPosition - originalCentreOfMass[i]);
+			}
+		}
 
-	A_tilde_qq = SquareMatrix(9);
-	A_tilde_qq = 0.0;
-	try {
-        A_tilde_qq = A_tilde_qq_inverse.i();
-	}catch (SingularException) {
-		A_tilde_qq = IdentityMatrix(9);
+		// calculate A_qq
+		matrix4 A_qq_inverse;
+		for (int i = 0; i < (int)particles.size(); i++) {
+			// m_i * q_i * (q_i)^T
+			Particle *par = particles[i];
+			f32 m = par->weight;
+			A_qq_inverse(0, 0) += m*q[i].X*q[i].X; A_qq_inverse(1, 0) += m*q[i].X*q[i].Y; A_qq_inverse(2, 0) += m*q[i].X*q[i].Z;
+			A_qq_inverse(0, 1) += m*q[i].Y*q[i].X; A_qq_inverse(1, 1) += m*q[i].Y*q[i].Y; A_qq_inverse(2, 1) += m*q[i].Y*q[i].Z;
+			A_qq_inverse(0, 2) += m*q[i].Z*q[i].X; A_qq_inverse(1, 2) += m*q[i].Z*q[i].Y; A_qq_inverse(2, 2) += m*q[i].Z*q[i].Z;
+		}
+		// ^T
+		A_qq_inverse.getInverse(A_qq);
+	}
+	else{
+		// calculate centre of mass (t_0)
+		vector3df tmpSum(0.0f, 0.0f, 0.0f);
+		float tmpMass = 0.0f;
+		for (u32 index = 0; index < particles.size(); index++) {
+			Particle* particle = particles[index];
+			//tmpSum += particle->originalPosition * particle->weight;
+			// sigma(m_i * x0_i)
+			tmpSum.X += particle->weight * particle->originalPosition.X;
+			tmpSum.Y += particle->weight * particle->originalPosition.Y;
+			tmpSum.Z += particle->weight * particle->originalPosition.Z;
+			tmpMass += particle->weight;
+		}
+		// x0_cm = sigma(m_i * x0_i) / sigma(m_i)
+		originalCentreOfMass = tmpSum / tmpMass;
+
+		// update q_i
+		//clear()
+		// Clears the array and deletes all allocated memory.
+		q.clear();
+		for (u32 index = 0; index < particles.size(); index++) {
+			Particle* p = particles[index];
+			//push_back()
+			// Adds an element at back of array.
+			// If the array is too small to add this new element it is made bigger.
+			// q_i = x0_i - x0_cm
+			q.push_back(p->originalPosition - originalCentreOfMass);
+		}
+
+		// calculate A_qq
+		matrix4 A_qq_inverse;
+		for (int i = 0; i < (int)particles.size(); i++) {
+			// m_i * q_i * (q_i)^T
+			Particle *par = particles[i];
+			f32 m = par->weight;
+			A_qq_inverse(0, 0) += m*q[i].X*q[i].X; A_qq_inverse(1, 0) += m*q[i].X*q[i].Y; A_qq_inverse(2, 0) += m*q[i].X*q[i].Z;
+			A_qq_inverse(0, 1) += m*q[i].Y*q[i].X; A_qq_inverse(1, 1) += m*q[i].Y*q[i].Y; A_qq_inverse(2, 1) += m*q[i].Y*q[i].Z;
+			A_qq_inverse(0, 2) += m*q[i].Z*q[i].X; A_qq_inverse(1, 2) += m*q[i].Z*q[i].Y; A_qq_inverse(2, 2) += m*q[i].Z*q[i].Z;
+		}
+		// ^T
+		A_qq_inverse.getInverse(A_qq);
+		// update q_tilde_i
+		// q_tilde = [q_x, q_y, q_z, q_x^2, q_y^2, q_z^2, q_x * q_y, q_y * q_z, q_z * q_x]^T
+		q_tilde.clear();
+		for (u32 index = 0; index < particles.size(); index++) {
+			Particle* p = particles[index];
+			ColumnVector t(9);
+			t.element(0) = q[index].X;
+			t.element(1) = q[index].Y;
+			t.element(2) = q[index].Z;
+			t.element(3) = q[index].X * q[index].X;
+			t.element(4) = q[index].Y * q[index].Y;
+			t.element(5) = q[index].Z * q[index].Z;
+			t.element(6) = q[index].X * q[index].Y;
+			t.element(7) = q[index].Y * q[index].Z;
+			t.element(8) = q[index].Z * q[index].X;
+			q_tilde.push_back(t);
+		}
+
+		// calculate A_tilde_qq
+		SquareMatrix A_tilde_qq_inverse(9);
+		A_tilde_qq_inverse = 0.0;
+		for (u32 index = 0; index < particles.size(); index++) {
+			// m_i * q_tilde_i * q_tilde_i^T
+			A_tilde_qq_inverse += q_tilde[index] * q_tilde[index].t();
+		}
+
+		A_tilde_qq = SquareMatrix(9);
+		A_tilde_qq = 0.0;
+		try {
+			A_tilde_qq = A_tilde_qq_inverse.i();
+		}
+		catch (SingularException) {
+			A_tilde_qq = IdentityMatrix(9);
+		}
 	}
 }
 
@@ -141,22 +331,58 @@ matrix4 DeformableObject::calculateRotationMatrix(matrix4 A_pq)
 }
 
 void DeformableObject::updateGoalPositions(f32 timeElapsed) {
+	if (Globals::mode == DeformationMode::ClusterBased) {
+		// 4. Cluster-Bases deformation
+		// calc roofPosition only based on external forces 
+		for (u32 index = 0; index < particles.size(); index++) {
+			Particle* par = particles[index];
+			par->velocityRoof = par->velocity + par->getForces() * timeElapsed;
+			par->roofPosition = par->position + par->velocityRoof * timeElapsed;
+		}
 
-	// calc roofPosition only based on external forces 
-	for (u32 index = 0; index < particles.size(); index++) {
-		Particle* par = particles[index];
-		par->velocityRoof = par->velocity + par->getForces() * timeElapsed;
-		par->roofPosition = par->position + par->velocityRoof * timeElapsed ;
-	}	
-
-	vector3df tmpSum(0.0f,0.0f,0.0f);
-	float tmpMass = 0.0f;
-	for (u32 index = 0; index < particles.size(); index++) {
-		Particle* par = particles[index];
-		tmpSum += par->roofPosition * par->weight;
-		tmpMass += par->weight;
+		// calculate current centre of mass
+		core::array<vector3df> currentCentreOfMass, tmpSum;
+		core::array<float> tmpMass = 0.0f;
+		tmpSum = (0.0f, 0.0f, 0.0f);
+		for (int i = 0; i < clusters.size(); i++){
+			// this cluster
+			vector3df sum(0.0f, 0.0f, 0.0f);
+			float mass = 0.0f;
+			for (u32 index = 0; index < particles.size(); index++) {
+				Particle* particle = particles[index];
+				//tmpSum += particle->roofPosition * particle->weight;
+				// sigma(m_i * x_i)
+				if (which_cluster(particle) == i){
+					// if this particle is in this cluster
+					sum.X += particle->weight * particle->roofPosition.X;
+					sum.Y += particle->weight * particle->roofPosition.Y;
+					sum.Z += particle->weight * particle->roofPosition.Z;
+					mass += particle->weight;
+				}// this particle over
+			}// all the particles in this cluster over
+			tmpSum.push_back(sum);
+			tmpMass.push_back(mass);
+			// next cluster
+		}// all the clusters over
+		// x_cm = sigma(m_i * x_i) / sigma(m_i)
+		for (int i = 0; i < clusters.size(); i++){
+			vector3df centre(0.0f, 0.0f, 0.0f);
+			centre.X += tmpSum[i].X / tmpMass[i];
+			centre.Y += tmpSum[i].Y / tmpMass[i];
+			centre.Z += tmpSum[i].Z / tmpMass[i];
+			currentCentreOfMass.push_back(centre);
+		}
 	}
-	currentCentreOfMass = tmpSum / tmpMass;
+	else{
+		vector3df tmpSum(0.0f, 0.0f, 0.0f);
+		float tmpMass = 0.0f;
+		for (u32 index = 0; index < particles.size(); index++) {
+			Particle* par = particles[index];
+			tmpSum += par->roofPosition * par->weight;
+			tmpMass += par->weight;
+		}
+		currentCentreOfMass = tmpSum / tmpMass;
+	}
 
 	// update p_i
 	p.clear();
@@ -263,6 +489,22 @@ void DeformableObject::updateGoalPositions(f32 timeElapsed) {
 			}
 		}
 	}
+	else if (Globals::mode == DeformationMode::ClusterBased) {
+		// 4. Cluster-Bases deformation
+		matrix4 A_pq = calculateA_pqMatrix();
+		matrix4 R = calculateRotationMatrix(A_pq);
+
+		// calculate goal positions and integrate
+		for (u32 i = 0; i < particles.size(); i++) {
+			vector3df goalPosition = q[i];
+			R.rotateVect(goalPosition);
+			goalPosition = goalPosition + currentCentreOfMass;
+
+			if (particles[i]->canMoveTo(goalPosition)) {
+				particles[i]->goalPosition = goalPosition;
+			}
+		}
+	}
 }
 
 void DeformableObject::update(f32 timeElapsed) {
@@ -298,278 +540,3 @@ void DeformableObject::setVisible(bool isVisible){
 	}
 		
 }
-
-/*
-#Code shared across examples
-import pylab, string, sys
-
-def stdDev(X):
-    mean = sum(X)/float(len(X))
-    tot = 0.0
-    for x in X:
-        tot += (x - mean)**2
-    return (tot/len(X))**0.5
-
-def scaleFeatures(vals):
-    """Assumes vals is a sequence of numbers"""
-    pylab.plot(vals)
-    result = pylab.array(vals)
-    mean = sum(result)/float(len(result))
-    result = result - mean
-    sd = stdDev(result)
-    result = result/sd
-    pylab.plot(result)
-    pylab.show()
-    return result
-
-class Point(object):
-    def __init__(self, name, originalAttrs):
-        """originalAttrs is an array"""
-        self.name = name
-        self.attrs = originalAttrs
-    def dimensionality(self):
-        return len(self.attrs)
-    def getAttrs(self):
-        return self.attrs
-    def distance(self, other):
-        #Euclidean distance metric
-        result = 0.0
-        for i in range(self.dimensionality()):
-            result += (self.attrs[i] - other.attrs[i])**2
-        return result**0.5
-    def getName(self):
-        return self.name
-    def toStr(self):
-        return self.name + str(self.attrs)
-    def __str__(self):
-        return self.name        
-    
-class Cluster(object):
-    """ A Cluster is defines as a set of elements, all having 
-    a particular type """
-    def __init__(self, points, pointType):
-        """ Elements of a cluster are saved in self.points
-        and the pointType is also saved """
-        self.points = points
-        self.pointType = pointType
-    def singleLinkageDist(self, other):
-        """ Returns the float distance between the points that 
-        are closest to each other, where one point is from 
-        self and the other point is from other. Uses the 
-        Euclidean dist between 2 points, defined in Point."""
-        dis = self.points[0].distance(other.points[0])
-        for i in self.points:
-            for j in other.points:
-                disN = i.distance(j)
-                if disN < dis:
-                    dis = disN
-        return dis
-    def maxLinkageDist(self, other):
-        """ Returns the float distance between the points that 
-        are farthest from each other, where one point is from 
-        self and the other point is from other. Uses the 
-        Euclidean dist between 2 points, defined in Point."""
-        dis = 0
-        for i in self.points:
-            for j in other.points:
-                disN = i.distance(j)
-                if disN > dis:
-                    dis = disN
-        return dis
-    def averageLinkageDist(self, other):
-        """ Returns the float average (mean) distance between all 
-        pairs of points, where one point is from self and the 
-        other point is from other. Uses the Euclidean dist 
-        between 2 points, defined in Point."""
-        dis = 0
-        index = 0
-        for i in self.points:
-            for j in other.points:
-                dis += i.distance(j)
-                index += 1
-        return float(dis) / index
-    def members(self):
-        for p in self.points:
-            yield p
-    def isIn(self, name):
-        """ Returns True is the element named name is in the cluster
-        and False otherwise """
-        for p in self.points:
-            if p.getName() == name:
-                return True
-        return False
-    def toStr(self):
-        result = ''
-        for p in self.points:
-            result = result + p.toStr() + ', '
-        return result[:-2]
-    def getNames(self):
-        """ For consistency, returns a sorted list of all 
-        elements in the cluster """
-        names = []
-        for p in self.points:
-            names.append(p.getName())
-        return sorted(names)
-    def __str__(self):
-        names = self.getNames()
-        result = ''
-        for p in names:
-            result = result + p + ', '
-        return result[:-2]
-
-class ClusterSet(object):
-    """ A ClusterSet is defined as a list of clusters """
-    def __init__(self, pointType):
-        """ Initialize an empty set, without any clusters """
-        self.members = []
-        self.pointType = pointType
-    def add(self, c):
-        """ Append a cluster to the end of the cluster list
-        only if it doesn't already exist. If it is already in the 
-        cluster set, raise a ValueError """
-        if c in self.members:
-            raise ValueError
-        self.members.append(c)
-    def getClusters(self):
-        return self.members[:]
-    def mergeClusters(self, c1, c2):
-        """ Assumes clusters c1 and c2 are in self
-        Adds to self a cluster containing the union of c1 and c2
-        and removes c1 and c2 from self """
-        # TO DO
-        points = []
-        type = self.pointType
-        for point1 in c1.members():
-            points.append(point1)
-        for point2 in c2.members():
-            if not c1.isIn(point2.getName()):
-                points.append(point2)
-        cN = Cluster(points, type)
-        self.add(cN)
-        self.members.remove(c1)
-        self.members.remove(c2)
-    def findClosest(self, linkage):
-        """ Returns a tuple containing the two most similar 
-        clusters in self
-        Closest defined using the metric linkage """
-        # TO DO
-        min = None
-        cluster1 = None
-        cluster2 = None
-        for i in range(len(self.getClusters())):
-            for j in range(i+1, len(self.getClusters())):
-                dis = linkage(self.getClusters()[i], self.getClusters()[j])
-                if min == None or min > dis:
-                    min = dis
-                    cluster1 = self.getClusters()[i]
-                    cluster2 = self.getClusters()[j]
-        return cluster1, cluster2
-    def mergeOne(self, linkage):
-        """ Merges the two most simililar clusters in self
-        Similar defined using the metric linkage
-        Returns the clusters that were merged """
-        # TO DO
-        cluster1, cluster2 = self.findClosest(linkage)
-        self.mergeClusters(cluster1, cluster2)
-        return cluster1, cluster2
-    def numClusters(self):
-        return len(self.members)
-    def toStr(self):
-        cNames = []
-        for c in self.members:
-            cNames.append(c.getNames())
-        cNames.sort()
-        result = ''
-        for i in range(len(cNames)):
-            names = ''
-            for n in cNames[i]:
-                names += n + ', '
-            names = names[:-2]
-            result += '  C' + str(i) + ':' + names + '\n'
-        return result
-
-#City climate example
-class City(Point):
-    pass
-
-def readCityData(fName, scale = False):
-    """Assumes scale is a Boolean.  If True, features are scaled"""
-    dataFile = open(fName, 'r')
-    numFeatures = 0
-    #Process lines at top of file
-    for line in dataFile: #Find number of features
-        if line[0:4] == '#end': #indicates end of features
-            break
-        numFeatures += 1
-    numFeatures -= 1
-    featureVals = []
-    
-    #Produce featureVals, cityNames
-    featureVals, cityNames = [], []
-    for i in range(numFeatures):
-        featureVals.append([])
-        
-    #Continue processing lines in file, starting after comments
-    for line in dataFile:
-        dataLine = string.split(line[:-1], ',') #remove newline; then split
-        cityNames.append(dataLine[0])
-        for i in range(numFeatures):
-            featureVals[i].append(float(dataLine[i+1]))
-            
-    #Use featureVals to build list containing the feature vectors
-    #For each city scale features, if needed
-    if scale:
-        for i in range(numFeatures):
-            featureVals[i] = scaleFeatures(featureVals[i])
-    featureVectorList = []
-    for city in range(len(cityNames)):
-        featureVector = []
-        for feature in range(numFeatures):
-            featureVector.append(featureVals[feature][city])
-        featureVectorList.append(featureVector)
-    return cityNames, featureVectorList
-
-def buildCityPoints(fName, scaling):
-    cityNames, featureList = readCityData(fName, scaling)
-    points = []
-    for i in range(len(cityNames)):
-        point = City(cityNames[i], pylab.array(featureList[i]))
-        points.append(point)
-    return points
-
-#Use hierarchical clustering for cities
-def hCluster(points, linkage, numClusters, printHistory):
-    cS = ClusterSet(City)
-    for p in points:
-        cS.add(Cluster([p], City))
-    history = []
-    while cS.numClusters() > numClusters:
-        merged = cS.mergeOne(linkage)
-        history.append(merged)
-    if printHistory:
-        print ''
-        for i in range(len(history)):
-            names1 = []
-            for p in history[i][0].members():
-                names1.append(p.getName())
-            names2 = []
-            for p in history[i][1].members():
-                names2.append(p.getName())
-            print 'Step', i, 'Merged', names1, 'with', names2
-            print ''
-    print 'Final set of clusters:'
-    print cS.toStr()
-    return cS
-
-def test():
-    #points = buildCityPoints('/Users/Rose/Documents/University/Course Online/Introduction to Computational Thinking and Data Science/ProSet6/cityTemps.txt', False)
-    #hCluster(points, Cluster.singleLinkageDist, 10, False)
-    #hCluster(points, Cluster.singleLinkageDist, 5, False)
-    points = buildCityPoints('/Users/Rose/Documents/University/Course Online/Introduction to Computational Thinking and Data Science/ProSet6/cityTemps.txt', True)
-    hCluster(points, Cluster.singleLinkageDist, 5, False)
-    #hCluster(points, Cluster.averageLinkageDist, 10, False)
-    #hCluster(points, Cluster.singleLinkageDist, 10, False)
-
-test()
-
-*/
